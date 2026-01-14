@@ -1,9 +1,13 @@
-import { chromium, Browser, Page } from 'playwright';
-import { BaTAuction, ScraperConfig, DEFAULT_CONFIG } from './types';
-import { collectAuctionUrls } from './page-handlers/results-page';
-import { extractAuctionData } from './page-handlers/auction-page';
-import { transformAuctionData, isValidAuction } from './transformers';
-import { exportToCsv } from './csv-exporter';
+import { chromium, Browser, Page } from "playwright";
+import { BaTAuction, ScraperConfig, DEFAULT_CONFIG } from "./types";
+import { collectAuctionUrls } from "./page-handlers/results-page";
+import { extractAuctionData } from "./page-handlers/auction-page";
+import {
+  transformAuctionData,
+  isValidAuction,
+  isSoldAuction,
+} from "./transformers";
+import { exportToCsv } from "./csv-exporter";
 
 /**
  * Main scraper class for Bring a Trailer auctions
@@ -21,7 +25,7 @@ export class BaTScraper {
    * Initialize the browser
    */
   async init(): Promise<void> {
-    console.log('🚀 Starting BaT Scraper...');
+    console.log("🚀 Starting BaT Scraper...");
     console.log(`   Headless: ${this.config.headless}`);
     console.log(`   Target auctions: ${this.config.auctionCount}`);
 
@@ -31,7 +35,7 @@ export class BaTScraper {
 
     const context = await this.browser.newContext({
       userAgent:
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 800 },
     });
 
@@ -43,14 +47,17 @@ export class BaTScraper {
    */
   async run(): Promise<BaTAuction[]> {
     if (!this.page) {
-      throw new Error('Scraper not initialized. Call init() first.');
+      throw new Error("Scraper not initialized. Call init() first.");
     }
 
     const auctions: BaTAuction[] = [];
 
     try {
       // Step 1: Collect auction URLs from results page
-      const urls = await collectAuctionUrls(this.page, this.config.auctionCount);
+      const urls = await collectAuctionUrls(
+        this.page,
+        this.config.auctionCount
+      );
 
       // Step 2: Visit each auction page and extract data
       for (let i = 0; i < urls.length; i++) {
@@ -60,6 +67,13 @@ export class BaTScraper {
         try {
           // Extract raw data
           const rawData = await extractAuctionData(this.page, url);
+
+          // Skip non-sold auctions (active bids or withdrawn)
+          if (!isSoldAuction(rawData)) {
+            const status = rawData.saleInfo.status || "unknown";
+            console.log(`   ⏭️ Skipped (${status}): ${rawData.title || url}`);
+            continue;
+          }
 
           // Transform to clean data
           const auction = transformAuctionData(rawData);
@@ -87,7 +101,7 @@ export class BaTScraper {
         console.log(`\n🎉 Successfully scraped ${auctions.length} auctions!`);
         console.log(`   Output: ${csvPath}`);
       } else {
-        console.log('\n⚠️ No auctions were scraped successfully.');
+        console.log("\n⚠️ No auctions were scraped successfully.");
       }
 
       return auctions;
@@ -104,7 +118,7 @@ export class BaTScraper {
       await this.browser.close();
       this.browser = null;
       this.page = null;
-      console.log('\n👋 Browser closed.');
+      console.log("\n👋 Browser closed.");
     }
   }
 

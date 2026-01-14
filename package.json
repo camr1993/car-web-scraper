@@ -6,7 +6,7 @@
   "scripts": {
     "scrape": "npx ts-node scripts/run.ts",
     "scrape:headed": "HEADLESS=false npx ts-node scripts/run.ts",
-    "scrape:many": "AUCTION_COUNT=50 npx ts-node scripts/run.ts"
+    "scrape:many": "AUCTION_COUNT=1213 npx ts-node scripts/run.ts"
   },
   "keywords": [
     "scraper",

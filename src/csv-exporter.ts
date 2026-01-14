@@ -1,14 +1,11 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { BaTAuction } from './types';
+import * as fs from "fs";
+import * as path from "path";
+import { BaTAuction } from "./types";
 
 /**
  * Export auctions to a CSV file
  */
-export function exportToCsv(
-  auctions: BaTAuction[],
-  outputDir: string
-): string {
+export function exportToCsv(auctions: BaTAuction[], outputDir: string): string {
   // Ensure output directory exists
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -21,28 +18,30 @@ export function exportToCsv(
 
   // Define CSV headers
   const headers = [
-    'title',
-    'make',
-    'model',
-    'era',
-    'origin',
-    'vehicleLocation',
-    'seller',
-    'sellerLocation',
-    'sellerType',
-    'listingDetail1',
-    'listingDetail2',
-    'listingDetail3',
-    'listingDetail4',
-    'listingDetail5',
-    'views',
-    'watchers',
-    'auctionUrl',
-    'scrapedAt',
+    "title",
+    "make",
+    "model",
+    "era",
+    "origin",
+    "vehicleLocation",
+    "seller",
+    "sellerLocation",
+    "sellerType",
+    "listingDetail1",
+    "listingDetail2",
+    "listingDetail3",
+    "listingDetail4",
+    "listingDetail5",
+    "views",
+    "watchers",
+    "dateSold",
+    "saleAmount",
+    "auctionUrl",
+    "scrapedAt",
   ];
 
   // Build CSV content
-  const rows: string[] = [headers.join(',')];
+  const rows: string[] = [headers.join(",")];
 
   for (const auction of auctions) {
     const row = [
@@ -55,21 +54,23 @@ export function exportToCsv(
       escapeCSV(auction.seller),
       escapeCSV(auction.sellerLocation),
       escapeCSV(auction.sellerType),
-      escapeCSV(auction.listingDetails[0] || ''),
-      escapeCSV(auction.listingDetails[1] || ''),
-      escapeCSV(auction.listingDetails[2] || ''),
-      escapeCSV(auction.listingDetails[3] || ''),
-      escapeCSV(auction.listingDetails[4] || ''),
+      escapeCSV(auction.listingDetails[0] || ""),
+      escapeCSV(auction.listingDetails[1] || ""),
+      escapeCSV(auction.listingDetails[2] || ""),
+      escapeCSV(auction.listingDetails[3] || ""),
+      escapeCSV(auction.listingDetails[4] || ""),
       auction.views.toString(),
       auction.watchers.toString(),
+      escapeCSV(auction.dateSold),
+      auction.saleAmount.toString(),
       escapeCSV(auction.auctionUrl),
       escapeCSV(auction.scrapedAt),
     ];
-    rows.push(row.join(','));
+    rows.push(row.join(","));
   }
 
-  const csvContent = rows.join('\n');
-  fs.writeFileSync(filepath, csvContent, 'utf-8');
+  const csvContent = rows.join("\n");
+  fs.writeFileSync(filepath, csvContent, "utf-8");
 
   console.log(`📁 CSV exported to: ${filepath}`);
   return filepath;
@@ -82,7 +83,7 @@ function escapeCSV(value: string): string {
   if (!value) return '""';
 
   // If the value contains comma, quote, or newline, wrap in quotes
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
     // Escape existing quotes by doubling them
     const escaped = value.replace(/"/g, '""');
     return `"${escaped}"`;
@@ -95,7 +96,7 @@ function escapeCSV(value: string): string {
  * Format a date as YYYY-MM-DD_HH-mm-ss
  */
 function formatTimestamp(date: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, '0');
+  const pad = (n: number) => n.toString().padStart(2, "0");
 
   const year = date.getFullYear();
   const month = pad(date.getMonth() + 1);

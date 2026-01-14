@@ -19,6 +19,10 @@ export interface BaTAuction {
   views: number;
   watchers: number;
 
+  // Sale info
+  dateSold: string;
+  saleAmount: number;
+
   // Metadata
   title: string;
   auctionUrl: string;
@@ -46,6 +50,11 @@ export interface RawAuctionData {
     views?: string;
     watchers?: string;
   };
+  saleInfo: {
+    status?: "sold" | "bid" | "withdrawn" | "unknown";
+    dateSold?: string;
+    amount?: string;
+  };
   title?: string;
   url: string;
 }
@@ -71,5 +80,5 @@ export const DEFAULT_CONFIG: ScraperConfig = {
   auctionCount: 3,
   headless: true,
   delayBetweenPages: 1500,
-  outputDir: './output',
+  outputDir: "./output",
 };
