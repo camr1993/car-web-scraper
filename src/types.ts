@@ -20,6 +20,7 @@ export interface BaTAuction {
   watchers: number;
 
   // Sale info
+  status: "sold" | "bid";
   dateSold: string;
   saleAmount: number;
 
@@ -82,3 +83,22 @@ export const DEFAULT_CONFIG: ScraperConfig = {
   delayBetweenPages: 1500,
   outputDir: "./output",
 };
+
+/**
+ * Statistics from a scraper run
+ */
+export interface ScraperStats {
+  sold: number;
+  bid: number;
+  skipped: number;
+  errors: Array<{ url: string; error: string }>;
+}
+
+/**
+ * Result of a scraper run
+ */
+export interface ScraperResult {
+  auctions: BaTAuction[];
+  stats: ScraperStats;
+  csvPath: string | null;
+}

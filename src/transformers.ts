@@ -26,6 +26,7 @@ export function transformAuctionData(raw: RawAuctionData): BaTAuction {
     watchers: parseNumber(raw.stats.watchers),
 
     // Sale info
+    status: raw.saleInfo.status as "sold" | "bid",
     dateSold: raw.saleInfo.dateSold || "Unknown",
     saleAmount: parseNumber(raw.saleInfo.amount),
 
@@ -78,9 +79,9 @@ export function isValidAuction(auction: BaTAuction): boolean {
 }
 
 /**
- * Check if the raw auction data represents a completed sale
- * Returns false for active auctions (bid) or withdrawn auctions
+ * Check if the auction should be included (sold or bid)
+ * Returns false for withdrawn auctions
  */
-export function isSoldAuction(raw: RawAuctionData): boolean {
-  return raw.saleInfo.status === "sold";
+export function shouldIncludeAuction(raw: RawAuctionData): boolean {
+  return raw.saleInfo.status === "sold" || raw.saleInfo.status === "bid";
 }

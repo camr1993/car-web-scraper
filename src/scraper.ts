@@ -1,11 +1,17 @@
 import { chromium, Browser, Page } from "playwright";
-import { BaTAuction, ScraperConfig, DEFAULT_CONFIG } from "./types";
+import {
+  BaTAuction,
+  ScraperConfig,
+  ScraperResult,
+  ScraperStats,
+  DEFAULT_CONFIG,
+} from "./types";
 import { collectAuctionUrls } from "./page-handlers/results-page";
 import { extractAuctionData } from "./page-handlers/auction-page";
 import {
   transformAuctionData,
   isValidAuction,
-  isSoldAuction,
+  shouldIncludeAuction,
 } from "./transformers";
 import { exportToCsv } from "./csv-exporter";
 
@@ -45,12 +51,18 @@ export class BaTScraper {
   /**
    * Run the scraper
    */
-  async run(): Promise<BaTAuction[]> {
+  async run(): Promise<ScraperResult> {
     if (!this.page) {
       throw new Error("Scraper not initialized. Call init() first.");
     }
 
     const auctions: BaTAuction[] = [];
+    const stats: ScraperStats = {
+      sold: 0,
+      bid: 0,
+      skipped: 0,
+      errors: [],
+    };
 
     try {
       // Step 1: Collect auction URLs from results page
@@ -68,10 +80,11 @@ export class BaTScraper {
           // Extract raw data
           const rawData = await extractAuctionData(this.page, url);
 
-          // Skip non-sold auctions (active bids or withdrawn)
-          if (!isSoldAuction(rawData)) {
+          // Skip withdrawn auctions
+          if (!shouldIncludeAuction(rawData)) {
             const status = rawData.saleInfo.status || "unknown";
             console.log(`   ⏭️ Skipped (${status}): ${rawData.title || url}`);
+            stats.skipped++;
             continue;
           }
 
@@ -81,9 +94,18 @@ export class BaTScraper {
           // Validate and add
           if (isValidAuction(auction)) {
             auctions.push(auction);
-            console.log(`   ✅ ${auction.title}`);
+
+            // Track by status
+            if (auction.status === "sold") {
+              stats.sold++;
+              console.log(`   ✅ [SOLD] ${auction.title}`);
+            } else {
+              stats.bid++;
+              console.log(`   ✅ [BID] ${auction.title}`);
+            }
           } else {
             console.log(`   ⚠️ Skipped (incomplete data): ${url}`);
+            stats.skipped++;
           }
 
           // Rate limiting - be nice to the server
@@ -91,20 +113,25 @@ export class BaTScraper {
             await this.delay(this.config.delayBetweenPages);
           }
         } catch (error) {
-          console.error(`   ❌ Error processing ${url}:`, error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          // Truncate long error messages
+          const shortError =
+            errorMessage.length > 100
+              ? errorMessage.substring(0, 100) + "..."
+              : errorMessage;
+          console.error(`   ❌ Error: ${shortError}`);
+          stats.errors.push({ url, error: errorMessage });
         }
       }
 
       // Step 3: Export to CSV
+      let csvPath: string | null = null;
       if (auctions.length > 0) {
-        const csvPath = exportToCsv(auctions, this.config.outputDir);
-        console.log(`\n🎉 Successfully scraped ${auctions.length} auctions!`);
-        console.log(`   Output: ${csvPath}`);
-      } else {
-        console.log("\n⚠️ No auctions were scraped successfully.");
+        csvPath = exportToCsv(auctions, this.config.outputDir);
       }
 
-      return auctions;
+      return { auctions, stats, csvPath };
     } finally {
       await this.close();
     }
@@ -135,7 +162,7 @@ export class BaTScraper {
  */
 export async function scrape(
   config: Partial<ScraperConfig> = {}
-): Promise<BaTAuction[]> {
+): Promise<ScraperResult> {
   const scraper = new BaTScraper(config);
   await scraper.init();
   return scraper.run();
