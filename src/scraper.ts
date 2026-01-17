@@ -1,4 +1,4 @@
-import { chromium, Browser, Page } from "playwright";
+import { chromium, Browser, BrowserContext, Page } from "playwright";
 import {
   BaTAuction,
   ScraperConfig,
@@ -15,13 +15,18 @@ import {
 } from "./transformers";
 import { exportToCsv } from "./csv-exporter";
 
+const USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 /**
  * Main scraper class for Bring a Trailer auctions
  */
 export class BaTScraper {
   private config: ScraperConfig;
   private browser: Browser | null = null;
+  private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private pageCount: number = 0;
 
   constructor(config: Partial<ScraperConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -39,13 +44,33 @@ export class BaTScraper {
       headless: this.config.headless,
     });
 
-    const context = await this.browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    await this.createNewContext();
+  }
+
+  /**
+   * Create a fresh browser context and page
+   */
+  private async createNewContext(): Promise<void> {
+    // Close existing context if any
+    if (this.context) {
+      await this.context.close().catch(() => {});
+    }
+
+    this.context = await this.browser!.newContext({
+      userAgent: USER_AGENT,
       viewport: { width: 1280, height: 800 },
     });
 
-    this.page = await context.newPage();
+    this.page = await this.context.newPage();
+    this.pageCount = 0;
+  }
+
+  /**
+   * Recover from a crashed page by creating a new context
+   */
+  private async recoverFromCrash(): Promise<void> {
+    console.log("   🔄 Recovering from crash...");
+    await this.createNewContext();
   }
 
   /**
@@ -76,9 +101,16 @@ export class BaTScraper {
         const url = urls[i];
         console.log(`\n📄 Processing auction ${i + 1}/${urls.length}`);
 
+        // Periodically refresh the context to prevent memory issues (every 50 pages)
+        if (this.pageCount > 0 && this.pageCount % 50 === 0) {
+          console.log("   🔄 Refreshing browser context...");
+          await this.createNewContext();
+        }
+
         try {
           // Extract raw data
-          const rawData = await extractAuctionData(this.page, url);
+          const rawData = await extractAuctionData(this.page!, url);
+          this.pageCount++;
 
           // Skip withdrawn auctions
           if (!shouldIncludeAuction(rawData)) {
@@ -115,6 +147,61 @@ export class BaTScraper {
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
+
+          // Check if this is a crash - if so, recover and retry once
+          if (
+            errorMessage.includes("crashed") ||
+            errorMessage.includes("page.goto")
+          ) {
+            console.error(`   ❌ Page crashed, attempting recovery...`);
+            await this.recoverFromCrash();
+
+            // Retry this URL once after recovery
+            try {
+              const rawData = await extractAuctionData(this.page!, url);
+              this.pageCount++;
+
+              if (!shouldIncludeAuction(rawData)) {
+                const status = rawData.saleInfo.status || "unknown";
+                console.log(
+                  `   ⏭️ Skipped (${status}): ${rawData.title || url}`
+                );
+                stats.skipped++;
+                continue;
+              }
+
+              const auction = transformAuctionData(rawData);
+              if (isValidAuction(auction)) {
+                auctions.push(auction);
+                if (auction.status === "sold") {
+                  stats.sold++;
+                  console.log(`   ✅ [SOLD] ${auction.title}`);
+                } else {
+                  stats.bid++;
+                  console.log(`   ✅ [BID] ${auction.title}`);
+                }
+              } else {
+                console.log(`   ⚠️ Skipped (incomplete data): ${url}`);
+                stats.skipped++;
+              }
+
+              if (i < urls.length - 1) {
+                await this.delay(this.config.delayBetweenPages);
+              }
+              continue;
+            } catch (retryError) {
+              const retryMessage =
+                retryError instanceof Error
+                  ? retryError.message
+                  : String(retryError);
+              console.error(
+                `   ❌ Retry failed: ${retryMessage.substring(0, 80)}...`
+              );
+              stats.errors.push({ url, error: retryMessage });
+              continue;
+            }
+          }
+
           // Truncate long error messages
           const shortError =
             errorMessage.length > 100
@@ -141,10 +228,14 @@ export class BaTScraper {
    * Close the browser
    */
   async close(): Promise<void> {
+    if (this.context) {
+      await this.context.close().catch(() => {});
+      this.context = null;
+      this.page = null;
+    }
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
-      this.page = null;
       console.log("\n👋 Browser closed.");
     }
   }

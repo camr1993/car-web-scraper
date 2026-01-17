@@ -2,6 +2,8 @@
 
 A web scraper built with Playwright to collect completed auction data from [Bring a Trailer](https://bringatrailer.com/), one of the largest online collector car auction platforms.
 
+By default, the scraper targets US-located vehicles sold within the last year with a final bid up to $100,000.
+
 ## Features
 
 - Scrapes completed auction listings from Bring a Trailer

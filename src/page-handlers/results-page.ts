@@ -1,8 +1,9 @@
-import { Page } from '@playwright/test';
+import { Page } from "@playwright/test";
 
-const RESULTS_URL = 'https://bringatrailer.com/auctions/results/';
-const AUCTION_CARD_SELECTOR = '.auctions-container a.listing-card';
-const SHOW_MORE_BUTTON_SELECTOR = 'button.auctions-footer-button';
+const RESULTS_URL =
+  "https://bringatrailer.com/auctions/results/?location=US&timeFrame=1Y&result=sold&bidTo=100000";
+const AUCTION_CARD_SELECTOR = ".auctions-container a.listing-card";
+const SHOW_MORE_BUTTON_SELECTOR = "button.auctions-footer-button";
 
 /**
  * Navigate to the BaT results page and collect auction URLs
@@ -12,18 +13,22 @@ export async function collectAuctionUrls(
   count: number
 ): Promise<string[]> {
   console.log(`📋 Navigating to BaT auction results...`);
-  await page.goto(RESULTS_URL, { waitUntil: 'networkidle' });
+  await page.goto(RESULTS_URL, { waitUntil: "networkidle" });
+  console.log("Navigated to results page");
 
   // Scroll down to the "All Completed Auctions" section
   await page.evaluate(() => window.scrollTo(0, 1500));
   await page.waitForTimeout(500);
+  console.log("Scrolled down to the 'All Completed Auctions' section");
 
   const urls: string[] = [];
 
   while (urls.length < count) {
-    // Wait for auction cards to be present
-    await page.waitForSelector(AUCTION_CARD_SELECTOR, { timeout: 10000 });
-
+    // Wait for auction cards to be present in the DOM
+    await page.waitForSelector(AUCTION_CARD_SELECTOR, {
+      timeout: 10000,
+      state: "attached",
+    });
     // Collect visible auction URLs
     const visibleUrls = await page.evaluate((selector) => {
       const cards = document.querySelectorAll(selector);
@@ -32,6 +37,7 @@ export async function collectAuctionUrls(
 
     // Add new URLs that we haven't collected yet
     for (const url of visibleUrls) {
+      console.log("Adding new URL: ", url);
       if (!urls.includes(url) && urls.length < count) {
         urls.push(url);
       }
@@ -44,7 +50,9 @@ export async function collectAuctionUrls(
     // Try to load more auctions
     const hasMore = await loadMoreAuctions(page);
     if (!hasMore) {
-      console.log(`⚠️ No more auctions to load. Collected ${urls.length} URLs.`);
+      console.log(
+        `⚠️ No more auctions to load. Collected ${urls.length} URLs.`
+      );
       break;
     }
   }
