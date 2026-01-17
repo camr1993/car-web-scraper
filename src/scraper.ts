@@ -93,7 +93,11 @@ export class BaTScraper {
       // Step 1: Collect auction URLs from results page
       const urls = await collectAuctionUrls(
         this.page,
-        this.config.auctionCount
+        this.config.auctionCount,
+        {
+          debugScreenshots: this.config.debugScreenshots,
+          outputDir: this.config.outputDir,
+        }
       );
 
       // Step 2: Visit each auction page and extract data

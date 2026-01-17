@@ -72,6 +72,8 @@ export interface ScraperConfig {
   delayBetweenPages: number;
   /** Output directory for CSV files */
   outputDir: string;
+  /** Take debug screenshots when errors occur */
+  debugScreenshots: boolean;
 }
 
 /**
@@ -82,6 +84,7 @@ export const DEFAULT_CONFIG: ScraperConfig = {
   headless: true,
   delayBetweenPages: 1500,
   outputDir: "./output",
+  debugScreenshots: false,
 };
 
 /**

@@ -5,9 +5,10 @@ import { ScraperConfig } from "../src/types";
  * Entry point for the BaT scraper
  *
  * Environment variables:
- *   HEADLESS=false     - Run browser in headed mode (visible)
- *   AUCTION_COUNT=10   - Number of auctions to scrape
- *   DELAY_MS=2000      - Delay between page visits in ms
+ *   HEADLESS=false        - Run browser in headed mode (visible)
+ *   AUCTION_COUNT=10      - Number of auctions to scrape
+ *   DELAY_MS=2000         - Delay between page visits in ms
+ *   DEBUG_SCREENSHOTS=true - Take screenshots on errors for debugging
  */
 async function main() {
   // Parse configuration from environment variables
@@ -16,6 +17,7 @@ async function main() {
     auctionCount: parseInt(process.env.AUCTION_COUNT || "3", 10),
     delayBetweenPages: parseInt(process.env.DELAY_MS || "1500", 10),
     outputDir: process.env.OUTPUT_DIR || "./output",
+    debugScreenshots: process.env.DEBUG_SCREENSHOTS === "true",
   };
 
   console.log("═══════════════════════════════════════════════════════");

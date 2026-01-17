@@ -5,20 +5,36 @@ const RESULTS_URL =
 const AUCTION_CARD_SELECTOR = ".auctions-container a.listing-card";
 const SHOW_MORE_BUTTON_SELECTOR = "button.auctions-footer-button";
 
+interface CollectOptions {
+  debugScreenshots?: boolean;
+  outputDir?: string;
+}
+
 /**
  * Navigate to the BaT results page and collect auction URLs
  */
 export async function collectAuctionUrls(
   page: Page,
-  count: number
+  count: number,
+  options: CollectOptions = {}
 ): Promise<string[]> {
+  const { debugScreenshots = false, outputDir = "./output" } = options;
   console.log(`📋 Navigating to BaT auction results...`);
-  await page.goto(RESULTS_URL, { waitUntil: "networkidle" });
+  await page.goto(RESULTS_URL, {
+    waitUntil: "domcontentloaded",
+    timeout: 60000,
+  });
+
+  // Wait for auction cards to load before proceeding
+  await page.waitForSelector(AUCTION_CARD_SELECTOR, {
+    timeout: 30000,
+    state: "attached",
+  });
   console.log("Navigated to results page");
 
   // Scroll down to the "All Completed Auctions" section
   await page.evaluate(() => window.scrollTo(0, 1500));
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
   console.log("Scrolled down to the 'All Completed Auctions' section");
 
   const urls: string[] = [];
@@ -48,7 +64,10 @@ export async function collectAuctionUrls(
     }
 
     // Try to load more auctions
-    const hasMore = await loadMoreAuctions(page);
+    const hasMore = await loadMoreAuctions(page, {
+      debugScreenshots,
+      outputDir,
+    });
     if (!hasMore) {
       console.log(
         `⚠️ No more auctions to load. Collected ${urls.length} URLs.`
@@ -65,7 +84,12 @@ export async function collectAuctionUrls(
  * Scroll and click "Show More" to load additional auctions
  * Returns true if more auctions were loaded, false otherwise
  */
-async function loadMoreAuctions(page: Page): Promise<boolean> {
+async function loadMoreAuctions(
+  page: Page,
+  options: CollectOptions = {}
+): Promise<boolean> {
+  const { debugScreenshots = false, outputDir = "./output" } = options;
+
   // First try scrolling to trigger lazy loading
   const previousHeight = await page.evaluate(() => document.body.scrollHeight);
 
@@ -88,9 +112,26 @@ async function loadMoreAuctions(page: Page): Promise<boolean> {
       await showMoreButton.click();
       await page.waitForTimeout(1500);
       return true;
+    } else if (debugScreenshots) {
+      // Button not visible - take screenshot for debugging
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const screenshotPath = `${outputDir}/debug-no-show-more-${timestamp}.png`;
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`   📸 Screenshot saved: ${screenshotPath}`);
     }
-  } catch {
-    // Button not found or not clickable
+  } catch (error) {
+    if (debugScreenshots) {
+      // Button not found or not clickable - take screenshot for debugging
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const screenshotPath = `${outputDir}/debug-show-more-error-${timestamp}.png`;
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log(`   📸 Screenshot saved: ${screenshotPath}`);
+    }
+    console.log(
+      `   ⚠️ Show more button error: ${
+        error instanceof Error ? error.message : error
+      }`
+    );
   }
 
   return false;
